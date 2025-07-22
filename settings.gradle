@@ -1,0 +1,7 @@
+rootProject.name = 'java-gradle-cicd-example'
+
+// 定义子模块
+include 'calculator-core'
+include 'calculator-api'
+include 'calculator-service'
+include 'calculator-web' 

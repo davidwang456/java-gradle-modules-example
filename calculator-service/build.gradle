@@ -1,0 +1,7 @@
+// calculator-service 模块配置
+dependencies {
+    // service模块依赖api模块
+    implementation project(':calculator-api')
+    // 添加Spring基础依赖，指定版本
+    implementation 'org.springframework.boot:spring-boot-starter:3.2.0'
+} 

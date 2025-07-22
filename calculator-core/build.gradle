@@ -1,0 +1,4 @@
+// calculator-core 模块配置
+dependencies {
+    // 核心模块没有外部依赖
+} 

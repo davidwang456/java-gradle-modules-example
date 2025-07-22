@@ -1,0 +1,5 @@
+// calculator-api 模块配置
+dependencies {
+    // API模块依赖core模块
+    implementation project(':calculator-core')
+} 

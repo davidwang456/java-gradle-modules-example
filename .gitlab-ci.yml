@@ -1,0 +1,60 @@
+image: ubuntu:22.04
+
+variables:
+  GRADLE_HOME: "/opt/gradle-8.14"
+  PATH: "$GRADLE_HOME/bin:$PATH"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  NEXUS_URL: ${NEXUS_URL}
+  NEXUS_USERNAME: ${NEXUS_USERNAME}
+  NEXUS_PASSWORD: ${NEXUS_PASSWORD}
+
+before_script:
+  - chmod +x $GRADLE_HOME/bin/gradle
+  - gradle --version
+
+stages:
+  - build
+  - test
+  - package
+  - deploy
+
+cache:
+  paths:
+    - .gradle/
+    - build/
+
+build:
+  stage: build
+  script:
+    - gradle build -x test --no-daemon
+  artifacts:
+    paths:
+      - build/libs/
+    expire_in: 1 week
+
+test:
+  stage: test
+  script:
+    - gradle test jacocoTestReport --no-daemon
+  artifacts:
+    paths:
+      - build/reports/tests/
+      - build/reports/jacoco/
+    expire_in: 1 week
+
+package:
+  stage: package
+  script:
+    - gradle assemble --no-daemon
+  artifacts:
+    paths:
+      - build/libs/*.jar
+    expire_in: 1 week
+
+deploy:
+  stage: deploy
+  script:
+    - gradle publish --no-daemon
+  only:
+    - main
+  when: manual 

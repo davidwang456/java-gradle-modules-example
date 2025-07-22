@@ -1,0 +1,142 @@
+// 添加Spring Boot插件管理
+plugins {
+    id 'org.springframework.boot' version '3.2.0' apply false
+    id 'io.spring.dependency-management' version '1.1.4' apply false
+    id 'org.sonarqube' version '4.4.1.3373'
+}
+
+// 根项目配置
+group 'io.codecov'
+version '1.0-SNAPSHOT'
+
+// 定义 Nexus URL
+def nexusUrl = System.getenv('NEXUS_URL') ?: project.findProperty('nexusUrl') ?: 'https://ss.nexus.com/sss-snapshots/'
+
+// 应用插件到所有子项目
+allprojects {
+    apply plugin: 'java'
+    apply plugin: 'jacoco'
+    apply plugin: 'maven-publish'
+
+    sourceCompatibility = 17
+    targetCompatibility = 17
+
+    repositories {
+        // 阿里云 Maven 仓库
+        maven { url = 'https://maven.aliyun.com/repository/public' }
+        maven { url = 'https://maven.aliyun.com/repository/spring' }
+        maven { url = 'https://maven.aliyun.com/repository/google' }
+        // 私有仓库配置
+        maven {
+            url = "https://your-private-repo.com/repository/maven-releases/"
+            credentials {
+                username = System.getenv("MAVEN_USERNAME") ?: project.findProperty("mavenUsername")
+                password = System.getenv("MAVEN_PASSWORD") ?: project.findProperty("mavenPassword")
+            }
+        }
+        // 原始 Maven 中央仓库
+        mavenCentral()
+        // Google Maven 仓库
+        maven { url = 'https://maven.google.com' }
+        // JCenter 仓库
+        jcenter()
+    }
+
+    // 通用依赖
+    dependencies {
+        testImplementation "junit:junit:4.13.2"
+    }
+
+    // 通用发布配置
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                groupId = project.group
+                artifactId = project.name
+                version = project.version
+                // 确保 SNAPSHOT 版本被正确识别
+                versionMapping {
+                    usage('java-api') {
+                        fromResolutionOf('runtimeClasspath')
+                    }
+                    usage('java-runtime') {
+                        fromResolutionResult()
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                url = "${nexusUrl}${project.name}/"
+                credentials {
+                    username = System.getenv("NEXUS_USERNAME") ?: project.findProperty("nexusUsername")
+                    password = System.getenv("NEXUS_PASSWORD") ?: project.findProperty("nexusPassword")
+                }
+            }
+        }
+    }
+
+    // 通用Jacoco配置
+    jacocoTestReport {
+        reports {
+            xml.required = true
+            html.required = true
+            csv.required = false
+        }
+    }
+    
+    jacocoTestCoverageVerification {
+        violationRules {
+            rule {
+                limit {
+                    counter = 'LINE'
+                    value = 'COVEREDRATIO'
+                    minimum = 0.8
+                }
+            }
+        }
+    }
+
+    check.dependsOn jacocoTestReport
+}
+
+// 根项目特定配置
+jar {
+    enabled = false
+}
+
+// 根项目不发布
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            // 根项目不发布
+        }
+    }
+}
+
+// SonarQube配置
+sonarqube {
+    properties {
+        property "sonar.projectKey", "java-gradle-cicd-example"
+        property "sonar.projectName", "Java Gradle Multi-Module Example"
+        property "sonar.projectVersion", "1.0-SNAPSHOT"
+        property "sonar.host.url", "http://localhost:9000"
+        property "sonar.login", System.getenv('SONAR_TOKEN') ?: ''
+        
+        // JaCoCo报告路径
+        property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
+        property "sonar.coverage.jacoco.htmlReportPaths", "build/reports/jacoco/test/html/"
+        
+        // 源码路径
+        property "sonar.sources", "src/main/java"
+        property "sonar.tests", "src/test/java"
+        
+        // 排除路径
+        property "sonar.exclusions", "**/build/**,**/gradle/**,**/*.gradle,**/gradlew*"
+        property "sonar.test.exclusions", "**/build/**"
+        
+        // 编码设置
+        property "sonar.sourceEncoding", "UTF-8"
+    }
+}
