@@ -29,7 +29,8 @@ build:
     - gradle build -x test --no-daemon
   artifacts:
     paths:
-      - build/libs/
+      - "build/libs/"
+      - "*/build/libs/"
     expire_in: 1 week
 
 test:
@@ -38,8 +39,8 @@ test:
     - gradle test jacocoTestReport --no-daemon
   artifacts:
     paths:
-      - build/reports/tests/
-      - build/reports/jacoco/
+      - "build/reports/"
+      - "*/build/reports/"
     expire_in: 1 week
 
 package:
@@ -48,7 +49,8 @@ package:
     - gradle assemble --no-daemon
   artifacts:
     paths:
-      - build/libs/*.jar
+      - "build/libs/*.jar"
+      - "*/build/libs/*.jar"
     expire_in: 1 week
 
 deploy:
