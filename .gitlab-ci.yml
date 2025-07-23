@@ -48,12 +48,16 @@ package:
   stage: package
   script:
     - gradle assemble --no-daemon
+    - echo "=== 查找所有 JAR 文件 ==="
+    - find . -path "*/build/libs/*.jar" -type f
+    - echo "=== 打包所有 JAR 文件为 all-jars.tar.gz ==="
+    - find . -path "*/build/libs/*.jar" -type f | tar -czvf all-jars.tar.gz -T -
+    - ls -lh all-jars.tar.gz
   artifacts:
     paths:
-      - "build/libs/*.jar"
-      - "*/build/libs/*.jar"
-      - "**/build/libs/*.jar"
+      - all-jars.tar.gz
     expire_in: 1 week
+
 
 deploy:
   stage: deploy
