@@ -31,6 +31,7 @@ build:
     paths:
       - "build/libs/"
       - "*/build/libs/"
+      - "**/build/libs/"
     expire_in: 1 week
 
 test:
@@ -41,6 +42,7 @@ test:
     paths:
       - "build/reports/"
       - "*/build/reports/"
+      - "**/build/reports/"
     expire_in: 1 week
 
 package:
@@ -51,6 +53,7 @@ package:
     paths:
       - "build/libs/*.jar"
       - "*/build/libs/*.jar"
+      - "**/build/libs/*.jar"
     expire_in: 1 week
 
 deploy:
