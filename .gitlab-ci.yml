@@ -27,12 +27,11 @@ build:
   stage: build
   script:
     - gradle build -x test --no-daemon
-  artifacts:
-    paths:
-      - "build/libs/"
-      - "*/build/libs/"
-      - "**/build/libs/"
-    expire_in: 1 week
+    - echo "=== 构建的JAR包列表 ==="
+    - find . -path "*/build/libs/*.jar" -type f -exec ls -lh {} \;
+    - echo "=== Gradle构建产物信息 ==="
+    - gradle properties | grep -E "(name|version|group)" || true
+    - echo "=== 构建完成 ==="
 
 test:
   stage: test
