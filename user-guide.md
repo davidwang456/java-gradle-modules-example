@@ -113,3 +113,94 @@ gradle test jacocoTestReport --init-script private-maven-init.gradle
 ---
 
 如需进一步定制或有特殊需求，请联系开发负责人。 
+
+---
+
+## 五、CI中上传 all-jars.zip 到 Nexus 示例
+
+假设参数：
+- Nexus 地址：`https://nexus.example.com`
+- 仓库名：`my-raw-repo`
+- 目标目录：`ci-artifacts/`
+- 文件名：`all-jars.zip`
+- 用户名/密码：`${NEXUS_USERNAME}` / `${NEXUS_PASSWORD}`（建议用 CI/CD 变量）
+
+### curl 上传命令
+
+```bash
+curl -u "${NEXUS_USERNAME}:${NEXUS_PASSWORD}" \
+  --upload-file all-jars.zip \
+  "https://nexus.example.com/repository/my-raw-repo/ci-artifacts/all-jars.zip"
+```
+
+### 在 .gitlab-ci.yml 中的用法
+
+```yaml
+upload:
+  stage: deploy
+  script:
+    - echo "=== 上传 all-jars.zip 到 Nexus ==="
+    - |
+      curl -u "${NEXUS_USERNAME}:${NEXUS_PASSWORD}" \
+        --upload-file all-jars.zip \
+        "https://nexus.example.com/repository/my-raw-repo/ci-artifacts/all-jars.zip"
+```
+
+### 说明
+- `-u "${NEXUS_USERNAME}:${NEXUS_PASSWORD}"`：使用 CI/CD 变量传递认证信息，安全可靠。
+- `--upload-file all-jars.zip`：指定要上传的文件。
+- URL 末尾的 `ci-artifacts/all-jars.zip`：指定上传到仓库的哪个目录和文件名。
+- 如果你用的是 maven 类型仓库，URL 结构会不同（通常需要 groupId、artifactId、version 等路径）。
+
+如需适配 maven 仓库或有特殊路径/命名需求，请补充说明！ 
+
+---
+
+## 六、CI中上传 all-jars.zip 到 Maven 类型仓库示例
+
+如果你用的是 Maven 类型仓库，上传路径必须符合 Maven 坐标规则（groupId/artifactId/version/文件名）。
+
+### curl 上传命令
+
+假设参数：
+- Nexus 地址：`https://nexus.example.com`
+- 仓库名：`maven-releases`
+- groupId：`com.example`
+- artifactId：`myapp`
+- version：`1.0.0`
+- 文件名：`myapp-1.0.0.zip`
+- 用户名/密码：`${NEXUS_USERNAME}` / `${NEXUS_PASSWORD}`
+
+命令如下：
+
+```bash
+curl -u "${NEXUS_USERNAME}:${NEXUS_PASSWORD}" \
+  --upload-file all-jars.zip \
+  "https://nexus.example.com/repository/maven-releases/com/example/myapp/1.0.0/myapp-1.0.0.zip"
+```
+
+### 在 .gitlab-ci.yml 中的用法
+
+```yaml
+upload:
+  stage: deploy
+  script:
+    - |
+      GROUP=$(grep '^group=' gradle.properties | cut -d'=' -f2 | tr -d '\r' | tr '.' '/')
+      ARTIFACT=$(grep '^artifactName=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+      VERSION=$(grep '^artifactVersion=' gradle.properties | cut -d'=' -f2 | tr -d '\r')
+      REPO="maven-releases"
+      FILE="${ARTIFACT}-${VERSION}.zip"
+      mv all-jars.zip "$FILE"
+      echo "=== 上传 $FILE 到 Nexus Maven 仓库 ==="
+      curl -u "${NEXUS_USERNAME}:${NEXUS_PASSWORD}" \
+        --upload-file "$FILE" \
+        "https://nexus.example.com/repository/${REPO}/${GROUP}/${ARTIFACT}/${VERSION}/${FILE}"
+```
+
+### 说明
+- groupId 必须用 `/` 分隔
+- artifactId、version、文件名要和路径一致
+- 这种方式适合上传自定义产物（如 zip），标准 jar/pom 建议用 Gradle 的 publish 任务
+
+如需进一步定制或有特殊需求，请联系开发负责人。 
