@@ -51,8 +51,10 @@ package:
     - echo "=== 查找所有 JAR 文件 ==="
     - find . -path "*/build/libs/*.jar" -type f
     - echo "=== 打包所有 JAR 文件为 all-jars.tar.gz ==="
-    - find . -path "*/build/libs/*.jar" -type f | tar -czvf all-jars.tar.gz -T -
-    - ls -lh all-jars.tar.gz
+    # - find . -path "*/build/libs/*.jar" -type f | tar -czvf all-jars.tar.gz -T -
+    - echo "=== 打包所有 JAR 文件为 all-jars.zip ==="
+    - find . -path "*/build/libs/*.jar" -type f | zip all-jars.zip -@ 
+    - ls -lh all-jars.zip
   artifacts:
     paths:
       - all-jars.tar.gz

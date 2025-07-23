@@ -14,73 +14,73 @@ def nexusUrl = System.getenv('NEXUS_URL') ?: project.findProperty('nexusUrl') ?:
 
 // 应用插件到所有子项目
 allprojects {
-    apply plugin: 'java'
-    apply plugin: 'jacoco'
-    apply plugin: 'maven-publish'
+apply plugin: 'java'
+apply plugin: 'jacoco'
+apply plugin: 'maven-publish'
 
-    sourceCompatibility = 17
-    targetCompatibility = 17
+sourceCompatibility = 17
+targetCompatibility = 17
 
-    repositories {
-        // 阿里云 Maven 仓库
-        maven { url = 'https://maven.aliyun.com/repository/public' }
-        maven { url = 'https://maven.aliyun.com/repository/spring' }
-        maven { url = 'https://maven.aliyun.com/repository/google' }
-        // 私有仓库配置
-        maven {
-            url = "https://your-private-repo.com/repository/maven-releases/"
-            credentials {
-                username = System.getenv("MAVEN_USERNAME") ?: project.findProperty("mavenUsername")
-                password = System.getenv("MAVEN_PASSWORD") ?: project.findProperty("mavenPassword")
-            }
+repositories {
+    // 阿里云 Maven 仓库
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+    maven { url = 'https://maven.aliyun.com/repository/spring' }
+    maven { url = 'https://maven.aliyun.com/repository/google' }
+    // 私有仓库配置
+    maven {
+        url = "https://your-private-repo.com/repository/maven-releases/"
+        credentials {
+            username = System.getenv("MAVEN_USERNAME") ?: project.findProperty("mavenUsername")
+            password = System.getenv("MAVEN_PASSWORD") ?: project.findProperty("mavenPassword")
         }
-        // 原始 Maven 中央仓库
-        mavenCentral()
-        // Google Maven 仓库
-        maven { url = 'https://maven.google.com' }
-        // JCenter 仓库
-        jcenter()
     }
+    // 原始 Maven 中央仓库
+    mavenCentral()
+    // Google Maven 仓库
+    maven { url = 'https://maven.google.com' }
+    // JCenter 仓库
+    jcenter()
+}
 
     // 通用依赖
-    dependencies {
-        testImplementation "junit:junit:4.13.2"
-    }
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+}
 
     // 通用发布配置
-    publishing {
-        publications {
-            mavenJava(MavenPublication) {
-                from components.java
-                groupId = project.group
-                artifactId = project.name
-                version = project.version
-                // 确保 SNAPSHOT 版本被正确识别
-                versionMapping {
-                    usage('java-api') {
-                        fromResolutionOf('runtimeClasspath')
-                    }
-                    usage('java-runtime') {
-                        fromResolutionResult()
-                    }
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId = project.group
+            artifactId = project.name
+            version = project.version
+            // 确保 SNAPSHOT 版本被正确识别
+            versionMapping {
+                usage('java-api') {
+                    fromResolutionOf('runtimeClasspath')
                 }
-            }
-        }
-        repositories {
-            maven {
-                url = "${nexusUrl}${project.name}/"
-                credentials {
-                    username = System.getenv("NEXUS_USERNAME") ?: project.findProperty("nexusUsername")
-                    password = System.getenv("NEXUS_PASSWORD") ?: project.findProperty("nexusPassword")
+                usage('java-runtime') {
+                    fromResolutionResult()
                 }
             }
         }
     }
+    repositories {
+        maven {
+            url = "${nexusUrl}${project.name}/"
+            credentials {
+                username = System.getenv("NEXUS_USERNAME") ?: project.findProperty("nexusUsername")
+                password = System.getenv("NEXUS_PASSWORD") ?: project.findProperty("nexusPassword")
+            }
+        }
+    }
+}
 
     // 通用Jacoco配置
-    jacocoTestReport {
-        reports {
-            xml.required = true
+jacocoTestReport {
+    reports {
+        xml.required = true
             html.required = true
             csv.required = false
         }
@@ -95,10 +95,10 @@ allprojects {
                     minimum = 0.8
                 }
             }
-        }
     }
+}
 
-    check.dependsOn jacocoTestReport
+check.dependsOn jacocoTestReport
 }
 
 // 根项目特定配置
