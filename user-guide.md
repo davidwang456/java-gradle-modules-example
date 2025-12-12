@@ -289,3 +289,444 @@ mvn -Dtest=**/your/custom/test/dir/** test
 - **只想运行某目录下的测试**：用 surefire 的 includes 配置。
 
 如需具体配置示例或有特殊目录结构，请补充说明！ 
+
+---
+
+## 八、pom.xml 中 build 标签位置说明
+
+在 `pom.xml` 文件中，`<build>` 标签应该放在以下位置：
+
+### 1. 标准位置（推荐）
+
+`<build>` 标签应该放在 `<project>` 根标签内，通常位于 `<dependencies>` 之后：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>my-project</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    
+    <name>My Project</name>
+    <description>My project description</description>
+    
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    
+    <!-- build 标签放在这里 -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>add-test-source</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>your/custom/test/dir</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+    
+</project>
+```
+
+### 2. 推荐的标签顺序
+
+在 `<project>` 内的标准顺序通常是：
+
+1. `<modelVersion>`
+2. `<groupId>`, `<artifactId>`, `<version>`, `<packaging>`
+3. `<name>`, `<description>`, `<url>`
+4. `<properties>`
+5. `<dependencies>`
+6. **`<build>`** ← 放在这里
+7. `<profiles>`
+8. `<modules>` (如果是父模块)
+9. `<dependencyManagement>`
+10. `<pluginManagement>`
+
+### 3. 注意事项
+
+- `<build>` 标签**不能**放在 `<dependencies>` 内部
+- `<build>` 标签**不能**放在 `<properties>` 内部
+- `<build>` 标签**不能**放在其他标签内部
+- `<build>` 标签必须直接放在 `<project>` 标签下
+
+### 4. 多模块项目
+
+在多模块项目中，父模块和子模块都可以有自己的 `<build>` 标签，位置相同。
+
+**总结**：`<build>` 标签应该放在 `<project>` 根标签内，通常位于 `<dependencies>` 之后，其他配置标签之前。
+
+如需具体配置示例或有特殊需求，请补充说明！ 
+
+---
+
+## 九、在 GitLab CI 中定义全局 build.gradle 配置
+
+在 GitLab CI 中，可以通过多种方式定义全局的 Gradle 配置，让所有 stage 共享相同的构建配置，避免在每个 job 中重复定义。
+
+### 方法一：使用全局变量定义 Gradle 命令（推荐）
+
+这是最简单直接的方式，通过定义全局变量统一管理 Gradle 命令：
+
+```yaml
+image: ubuntu:22.04
+
+variables:
+  GRADLE_HOME: "/opt/gradle-8.14"
+  PATH: "$GRADLE_HOME/bin:$PATH"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  NEXUS_URL: ${NEXUS_URL}
+  NEXUS_USERNAME: ${NEXUS_USERNAME}
+  NEXUS_PASSWORD: ${NEXUS_PASSWORD}
+  # 定义全局的 gradle 命令，包含 init script
+  GRADLE_CMD: "gradle --init-script ci-init.gradle"
+
+before_script:
+  - chmod +x $GRADLE_HOME/bin/gradle
+  - gradle --version
+  # 创建全局的 init.gradle 脚本
+  - |
+    cat > ci-init.gradle << 'EOF'
+    allprojects {
+        repositories {
+            // 阿里云 Maven 仓库
+            maven { url = 'https://maven.aliyun.com/repository/public' }
+            maven { url = 'https://maven.aliyun.com/repository/spring' }
+            maven { url = 'https://maven.aliyun.com/repository/google' }
+            // 私有仓库配置
+            maven {
+                url = System.getenv('NEXUS_URL') ?: 'https://your-private-repo.com/repository/maven-releases/'
+                credentials {
+                    username = System.getenv("NEXUS_USERNAME") ?: project.findProperty("nexusUsername")
+                    password = System.getenv("NEXUS_PASSWORD") ?: project.findProperty("nexusPassword")
+                }
+            }
+            mavenCentral()
+        }
+    }
+    EOF
+
+stages:
+  - build
+  - test
+  - package
+  - deploy
+
+cache:
+  paths:
+    - .gradle/
+    - build/
+
+build:
+  stage: build
+  script:
+    - $GRADLE_CMD build -x test --no-daemon
+    - echo "=== 构建的JAR包列表 ==="
+    - find . -path "*/build/libs/*.jar" -type f -exec ls -lh {} \;
+    - echo "=== Gradle构建产物信息 ==="
+    - gradle properties | grep -E "(name|version|group)" || true
+    - echo "=== 构建完成 ==="
+
+test:
+  stage: test
+  script:
+    - $GRADLE_CMD test jacocoTestReport --no-daemon
+  artifacts:
+    paths:
+      - "build/reports/"
+      - "*/build/reports/"
+      - "**/build/reports/"
+    expire_in: 1 week
+
+package:
+  stage: package
+  script:
+    - $GRADLE_CMD assemble --no-daemon
+    - echo "=== 查找所有 JAR 文件 ==="
+    - find . -path "*/build/libs/*.jar" -type f
+    - echo "=== 打包所有 JAR 文件为 all-jars.zip ==="
+    - find . -path "*/build/libs/*.jar" -type f -print0 | xargs -0 zip all-jars.zip
+    - ls -lh all-jars.zip
+  artifacts:
+    paths:
+      - all-jars.zip
+    expire_in: 1 week
+
+deploy:
+  stage: deploy
+  script:
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - main
+  when: manual
+```
+
+### 方法二：使用 extends 定义基础 job 模板
+
+使用 GitLab CI 的 `extends` 功能定义基础配置，所有 job 继承该配置：
+
+```yaml
+image: ubuntu:22.04
+
+variables:
+  GRADLE_HOME: "/opt/gradle-8.14"
+  PATH: "$GRADLE_HOME/bin:$PATH"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  NEXUS_URL: ${NEXUS_URL}
+  NEXUS_USERNAME: ${NEXUS_USERNAME}
+  NEXUS_PASSWORD: ${NEXUS_PASSWORD}
+
+before_script:
+  - chmod +x $GRADLE_HOME/bin/gradle
+  - gradle --version
+  # 创建全局的 init.gradle 脚本
+  - |
+    cat > ci-init.gradle << 'EOF'
+    allprojects {
+        repositories {
+            maven { url = 'https://maven.aliyun.com/repository/public' }
+            maven { url = 'https://maven.aliyun.com/repository/spring' }
+            maven { url = 'https://maven.aliyun.com/repository/google' }
+            maven {
+                url = System.getenv('NEXUS_URL') ?: 'https://your-private-repo.com/repository/maven-releases/'
+                credentials {
+                    username = System.getenv("NEXUS_USERNAME") ?: project.findProperty("nexusUsername")
+                    password = System.getenv("NEXUS_PASSWORD") ?: project.findProperty("nexusPassword")
+                }
+            }
+            mavenCentral()
+        }
+    }
+    EOF
+
+stages:
+  - build
+  - test
+  - package
+  - deploy
+
+cache:
+  paths:
+    - .gradle/
+    - build/
+
+# 定义基础 job 模板
+.gradle_base:
+  before_script:
+    - chmod +x $GRADLE_HOME/bin/gradle
+    - gradle --version
+  script:
+    - gradle --init-script ci-init.gradle
+
+build:
+  extends: .gradle_base
+  stage: build
+  script:
+    - gradle --init-script ci-init.gradle build -x test --no-daemon
+    - echo "=== 构建的JAR包列表 ==="
+    - find . -path "*/build/libs/*.jar" -type f -exec ls -lh {} \;
+    - echo "=== Gradle构建产物信息 ==="
+    - gradle properties | grep -E "(name|version|group)" || true
+    - echo "=== 构建完成 ==="
+
+test:
+  extends: .gradle_base
+  stage: test
+  script:
+    - gradle --init-script ci-init.gradle test jacocoTestReport --no-daemon
+  artifacts:
+    paths:
+      - "build/reports/"
+      - "*/build/reports/"
+      - "**/build/reports/"
+    expire_in: 1 week
+
+package:
+  extends: .gradle_base
+  stage: package
+  script:
+    - gradle --init-script ci-init.gradle assemble --no-daemon
+    - echo "=== 查找所有 JAR 文件 ==="
+    - find . -path "*/build/libs/*.jar" -type f
+    - echo "=== 打包所有 JAR 文件为 all-jars.zip ==="
+    - find . -path "*/build/libs/*.jar" -type f -print0 | xargs -0 zip all-jars.zip
+    - ls -lh all-jars.zip
+  artifacts:
+    paths:
+      - all-jars.zip
+    expire_in: 1 week
+
+deploy:
+  extends: .gradle_base
+  stage: deploy
+  script:
+    - gradle --init-script ci-init.gradle publish --no-daemon
+  only:
+    - main
+  when: manual
+```
+
+### 方法三：使用 YAML Anchors
+
+使用 YAML anchors 定义可复用的配置片段：
+
+```yaml
+image: ubuntu:22.04
+
+variables:
+  GRADLE_HOME: "/opt/gradle-8.14"
+  PATH: "$GRADLE_HOME/bin:$PATH"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2048m"
+  NEXUS_URL: ${NEXUS_URL}
+  NEXUS_USERNAME: ${NEXUS_USERNAME}
+  NEXUS_PASSWORD: ${NEXUS_PASSWORD}
+
+# 定义全局的 init.gradle 脚本创建步骤
+.gradle_init: &gradle_init
+  - |
+    cat > ci-init.gradle << 'EOF'
+    allprojects {
+        repositories {
+            maven { url = 'https://maven.aliyun.com/repository/public' }
+            maven { url = 'https://maven.aliyun.com/repository/spring' }
+            maven { url = 'https://maven.aliyun.com/repository/google' }
+            maven {
+                url = System.getenv('NEXUS_URL') ?: 'https://your-private-repo.com/repository/maven-releases/'
+                credentials {
+                    username = System.getenv("NEXUS_USERNAME") ?: project.findProperty("nexusUsername")
+                    password = System.getenv("NEXUS_PASSWORD") ?: project.findProperty("nexusPassword")
+                }
+            }
+            mavenCentral()
+        }
+    }
+    EOF
+
+# 定义通用的 gradle 命令前缀
+.gradle_cmd: &gradle_cmd
+  - gradle --init-script ci-init.gradle
+
+before_script:
+  - chmod +x $GRADLE_HOME/bin/gradle
+  - gradle --version
+  - *gradle_init
+
+stages:
+  - build
+  - test
+  - package
+  - deploy
+
+cache:
+  paths:
+    - .gradle/
+    - build/
+
+build:
+  stage: build
+  script:
+    - *gradle_cmd
+    - gradle --init-script ci-init.gradle build -x test --no-daemon
+    - echo "=== 构建的JAR包列表 ==="
+    - find . -path "*/build/libs/*.jar" -type f -exec ls -lh {} \;
+    - echo "=== Gradle构建产物信息 ==="
+    - gradle properties | grep -E "(name|version|group)" || true
+    - echo "=== 构建完成 ==="
+
+test:
+  stage: test
+  script:
+    - *gradle_cmd
+    - gradle --init-script ci-init.gradle test jacocoTestReport --no-daemon
+  artifacts:
+    paths:
+      - "build/reports/"
+      - "*/build/reports/"
+      - "**/build/reports/"
+    expire_in: 1 week
+
+package:
+  stage: package
+  script:
+    - *gradle_cmd
+    - gradle --init-script ci-init.gradle assemble --no-daemon
+    - echo "=== 查找所有 JAR 文件 ==="
+    - find . -path "*/build/libs/*.jar" -type f
+    - echo "=== 打包所有 JAR 文件为 all-jars.zip ==="
+    - find . -path "*/build/libs/*.jar" -type f -print0 | xargs -0 zip all-jars.zip
+    - ls -lh all-jars.zip
+  artifacts:
+    paths:
+      - all-jars.zip
+    expire_in: 1 week
+
+deploy:
+  stage: deploy
+  script:
+    - *gradle_cmd
+    - gradle --init-script ci-init.gradle publish --no-daemon
+  only:
+    - main
+  when: manual
+```
+
+### 方案对比
+
+| 方法 | 优点 | 缺点 | 适用场景 |
+|------|------|------|----------|
+| 方法一（全局变量） | 简单直接，易于维护 | 灵活性稍低 | 快速实现，统一配置 |
+| 方法二（extends） | 结构清晰，易于维护 | 配置稍复杂 | 需要多个 job 共享配置 |
+| 方法三（Anchors） | 简洁，复用性好 | YAML 语法要求高 | 简单项目，需要复用配置片段 |
+
+### 推荐方案
+
+**推荐使用方法一（全局变量）**，原因：
+1. ✅ **简单直接**：只需定义一个变量，所有 job 自动使用
+2. ✅ **易于维护**：修改配置只需在一个地方
+3. ✅ **自动继承**：所有 job 自动继承 `before_script` 中的 init script 创建
+4. ✅ **统一管理**：通过 `$GRADLE_CMD` 变量统一调用 Gradle 命令
+
+### 关键点说明
+
+1. **init script 的创建**：在 `before_script` 中动态创建 `ci-init.gradle`，确保所有 job 都能使用
+2. **环境变量使用**：通过 `System.getenv()` 读取 CI/CD 环境变量，安全可靠
+3. **配置复用**：通过全局变量或 extends 机制，避免在每个 job 中重复配置
+4. **缓存配置**：`.gradle/` 和 `build/` 目录的缓存可以加速后续构建
+
+### 注意事项
+
+- 确保在 GitLab CI/CD 变量设置中配置了 `NEXUS_URL`、`NEXUS_USERNAME`、`NEXUS_PASSWORD`
+- init script 中的单引号 `'EOF'` 可以防止变量在创建脚本时被展开
+- 如果需要在 init script 中使用环境变量，使用 `System.getenv()` 而不是 `${}` 语法
+
+如需进一步定制或有特殊需求，请联系开发负责人。
