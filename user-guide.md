@@ -723,6 +723,165 @@ deploy:
 3. **配置复用**：通过全局变量或 extends 机制，避免在每个 job 中重复配置
 4. **缓存配置**：`.gradle/` 和 `build/` 目录的缓存可以加速后续构建
 
+### 区分依赖库和发布库的配置
+
+在实际项目中，依赖下载的私有库和发布上传的私有库可能是不同的仓库。需要在 init script 中分别配置 `repositories {}`（用于下载依赖）和 `publishing.repositories {}`（用于发布上传）。
+
+#### 方案一：使用不同的环境变量（推荐）
+
+在 GitLab CI/CD 中定义不同的变量，然后在 init script 中分别使用：
+
+```groovy
+allprojects {
+    repositories {
+        // 阿里云 Maven 仓库
+        maven { url = 'https://maven.aliyun.com/repository/public' }
+        maven { url = 'https://maven.aliyun.com/repository/spring' }
+        maven { url = 'https://maven.aliyun.com/repository/google' }
+        // 依赖下载的私有仓库配置
+        maven {
+            name = 'dependencyRepository'
+            url = System.getenv('DEPENDENCY_NEXUS_URL') ?: System.getenv('NEXUS_URL') ?: 'https://dependency-repo.com/repository/maven-releases/'
+            credentials {
+                username = System.getenv("DEPENDENCY_NEXUS_USERNAME") ?: System.getenv("NEXUS_USERNAME") ?: project.findProperty("dependencyNexusUsername")
+                password = System.getenv("DEPENDENCY_NEXUS_PASSWORD") ?: System.getenv("NEXUS_PASSWORD") ?: project.findProperty("dependencyNexusPassword")
+            }
+        }
+        mavenCentral()
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin('maven-publish')) {
+            publishing {
+                repositories {
+                    // 发布上传的私有仓库配置
+                    maven {
+                        name = 'publishRepository'
+                        url = System.getenv('PUBLISH_NEXUS_URL') ?: System.getenv('NEXUS_URL') ?: 'https://publish-repo.com/repository/maven-releases/'
+                        credentials {
+                            username = System.getenv("PUBLISH_NEXUS_USERNAME") ?: System.getenv("NEXUS_USERNAME") ?: project.findProperty("publishNexusUsername")
+                            password = System.getenv("PUBLISH_NEXUS_PASSWORD") ?: System.getenv("NEXUS_PASSWORD") ?: project.findProperty("publishNexusPassword")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+#### 在 GitLab CI 中定义变量
+
+在 `.gitlab-ci.yml` 的 `variables` 部分定义不同的变量：
+
+```yaml
+variables:
+  GRADLE_HOME: "/opt/gradle-8.14"
+  PATH: "$GRADLE_HOME/bin:$PATH"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  
+  # 依赖下载的私有库配置
+  DEPENDENCY_NEXUS_URL: ${DEPENDENCY_NEXUS_URL}
+  DEPENDENCY_NEXUS_USERNAME: ${DEPENDENCY_NEXUS_USERNAME}
+  DEPENDENCY_NEXUS_PASSWORD: ${DEPENDENCY_NEXUS_PASSWORD}
+  
+  # 发布上传的私有库配置
+  PUBLISH_NEXUS_URL: ${PUBLISH_NEXUS_URL}
+  PUBLISH_NEXUS_USERNAME: ${PUBLISH_NEXUS_USERNAME}
+  PUBLISH_NEXUS_PASSWORD: ${PUBLISH_NEXUS_PASSWORD}
+```
+
+#### 方案二：根据版本类型区分（SNAPSHOT vs RELEASE）
+
+如果依赖库和发布库根据版本类型不同而不同：
+
+```groovy
+allprojects {
+    repositories {
+        // 阿里云 Maven 仓库
+        maven { url = 'https://maven.aliyun.com/repository/public' }
+        maven { url = 'https://maven.aliyun.com/repository/spring' }
+        maven { url = 'https://maven.aliyun.com/repository/google' }
+        // 依赖下载的私有仓库配置
+        maven {
+            name = 'dependencyReleases'
+            url = System.getenv('DEPENDENCY_RELEASES_URL') ?: 'https://dependency-repo.com/repository/maven-releases/'
+            credentials {
+                username = System.getenv("DEPENDENCY_NEXUS_USERNAME") ?: project.findProperty("dependencyNexusUsername")
+                password = System.getenv("DEPENDENCY_NEXUS_PASSWORD") ?: project.findProperty("dependencyNexusPassword")
+            }
+        }
+        maven {
+            name = 'dependencySnapshots'
+            url = System.getenv('DEPENDENCY_SNAPSHOTS_URL') ?: 'https://dependency-repo.com/repository/maven-snapshots/'
+            credentials {
+                username = System.getenv("DEPENDENCY_NEXUS_USERNAME") ?: project.findProperty("dependencyNexusUsername")
+                password = System.getenv("DEPENDENCY_NEXUS_PASSWORD") ?: project.findProperty("dependencyNexusPassword")
+            }
+        }
+        mavenCentral()
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin('maven-publish')) {
+            publishing {
+                repositories {
+                    // 根据版本类型选择发布仓库
+                    def isSnapshot = project.version.toString().endsWith("SNAPSHOT")
+                    def publishUrl = isSnapshot 
+                        ? (System.getenv('PUBLISH_SNAPSHOTS_URL') ?: 'https://publish-repo.com/repository/maven-snapshots/')
+                        : (System.getenv('PUBLISH_RELEASES_URL') ?: 'https://publish-repo.com/repository/maven-releases/')
+                    
+                    maven {
+                        name = isSnapshot ? 'publishSnapshots' : 'publishReleases'
+                        url = publishUrl
+                        credentials {
+                            username = System.getenv("PUBLISH_NEXUS_USERNAME") ?: project.findProperty("publishNexusUsername")
+                            password = System.getenv("PUBLISH_NEXUS_PASSWORD") ?: project.findProperty("publishNexusPassword")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+#### 变量命名建议
+
+在 GitLab CI/CD 变量中定义：
+
+**依赖下载相关变量：**
+- `DEPENDENCY_NEXUS_URL` - 依赖库的 URL
+- `DEPENDENCY_NEXUS_USERNAME` - 依赖库的用户名
+- `DEPENDENCY_NEXUS_PASSWORD` - 依赖库的密码
+
+**发布上传相关变量：**
+- `PUBLISH_NEXUS_URL` - 发布库的 URL
+- `PUBLISH_NEXUS_USERNAME` - 发布库的用户名
+- `PUBLISH_NEXUS_PASSWORD` - 发布库的密码
+
+#### 配置说明
+
+| 场景 | 配置位置 | 环境变量示例 | 说明 |
+|------|----------|-------------|------|
+| 下载依赖 | `repositories {}` | `DEPENDENCY_NEXUS_URL` | 用于从私有库下载依赖包 |
+| 发布上传 | `publishing.repositories {}` | `PUBLISH_NEXUS_URL` | 用于将构建产物发布到私有库 |
+| 统一配置（回退） | 两者都可以使用 | `NEXUS_URL` | 如果未设置特定变量，使用通用变量 |
+
+#### 关键点
+
+1. **`repositories {}`** 用于定义从哪里下载依赖
+2. **`publishing.repositories {}`** 用于定义发布到哪里
+3. **使用不同的环境变量**区分两者，提供更好的灵活性
+4. **提供回退机制**：如果未设置特定变量（如 `DEPENDENCY_NEXUS_URL`），则使用通用变量（如 `NEXUS_URL`）
+5. **使用 `name` 属性**：为每个仓库设置名称，便于调试和识别
+6. **使用 `afterEvaluate`**：确保在项目配置完成后才设置发布仓库
+
 ### 注意事项
 
 - 确保在 GitLab CI/CD 变量设置中配置了 `NEXUS_URL`、`NEXUS_USERNAME`、`NEXUS_PASSWORD`
