@@ -4,7 +4,149 @@
 
 ---
 
-## 一、动态 private-maven-init.gradle 脚本
+## 一、Gradle Project 对象常用属性说明
+
+在 Gradle 脚本中，`project` 对象代表当前项目，提供了丰富的属性和方法来访问和配置项目信息。
+
+### 常用属性
+
+#### 1. 基本信息属性
+
+| 属性 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `project.name` | String | 项目名称 | `project.name` → `"calculator-core"` |
+| `project.group` | String | 项目组ID（类似 Maven groupId） | `project.group` → `"io.codecov"` |
+| `project.version` | String/Object | 项目版本 | `project.version` → `"1.0-SNAPSHOT"` |
+| `project.description` | String | 项目描述 | `project.description` → `"计算器核心模块"` |
+| `project.path` | String | 项目路径（相对于根项目） | `project.path` → `":calculator-core"` |
+| `project.projectDir` | File | 项目目录 | `project.projectDir` → `/path/to/calculator-core` |
+| `project.buildDir` | File | 构建输出目录 | `project.buildDir` → `/path/to/calculator-core/build` |
+
+#### 2. 项目关系属性
+
+| 属性 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `project.rootProject` | Project | 根项目对象 | `project.rootProject.name` → `"java-gradle-cicd-example"` |
+| `project.parent` | Project | 父项目对象（如果是子项目） | `project.parent.name` |
+| `project.subprojects` | Set<Project> | 子项目集合 | `project.subprojects.each { ... }` |
+| `project.allprojects` | Set<Project> | 所有项目集合（包括自身） | `project.allprojects.each { ... }` |
+
+#### 3. 配置属性
+
+| 属性 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `project.plugins` | PluginContainer | 已应用的插件 | `project.plugins.hasPlugin('java')` |
+| `project.repositories` | RepositoryHandler | 仓库配置 | `project.repositories.mavenCentral()` |
+| `project.dependencies` | DependencyHandler | 依赖配置 | `project.dependencies.add(...)` |
+| `project.configurations` | ConfigurationContainer | 配置集合 | `project.configurations.getByName(...)` |
+| `project.tasks` | TaskContainer | 任务集合 | `project.tasks.getByName('build')` |
+| `project.extensions` | ExtensionContainer | 扩展配置 | `project.extensions.getByName(...)` |
+
+#### 4. 构建相关属性
+
+| 属性 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `project.sourceCompatibility` | JavaVersion | Java 源码兼容版本 | `project.sourceCompatibility = JavaVersion.VERSION_17` |
+| `project.targetCompatibility` | JavaVersion | Java 目标兼容版本 | `project.targetCompatibility = JavaVersion.VERSION_17` |
+| `project.sourceSets` | SourceSetContainer | 源码集配置 | `project.sourceSets.main.java.srcDirs` |
+| `project.buildFile` | File | build.gradle 文件 | `project.buildFile` → `/path/to/build.gradle` |
+
+### 常用方法
+
+#### 1. 属性查找方法
+
+```groovy
+// 查找项目属性（从 gradle.properties、命令行参数等）
+project.findProperty('propertyName')  // 返回属性值或 null
+project.hasProperty('propertyName')   // 返回 boolean
+
+// 示例
+def nexusUrl = project.findProperty('nexusUrl') ?: 'default-url'
+if (project.hasProperty('customProperty')) {
+    // 使用自定义属性
+}
+```
+
+#### 2. 文件操作方法
+
+```groovy
+project.file('path/to/file')           // 获取文件对象
+project.files('file1', 'file2')        // 获取文件集合
+project.fileTree('dir')                // 获取文件树
+project.copy { ... }                   // 复制文件
+```
+
+#### 3. 插件和扩展方法
+
+```groovy
+project.plugins.hasPlugin('java')      // 检查是否应用了插件
+project.plugins.apply('java')           // 应用插件
+project.extensions.getByName('java')   // 获取扩展配置
+```
+
+#### 4. 依赖和仓库方法
+
+```groovy
+project.repositories.mavenCentral()    // 添加 Maven 中央仓库
+project.dependencies.add('compile', 'group:artifact:version')  // 添加依赖
+```
+
+### 实际使用示例
+
+在 init script 或 build.gradle 中常用的 project 属性：
+
+```groovy
+subprojects {
+    afterEvaluate { project ->
+        // 1. 获取项目基本信息
+        println "项目名称: ${project.name}"
+        println "项目版本: ${project.version}"
+        println "项目组: ${project.group}"
+        println "项目路径: ${project.path}"
+        
+        // 2. 获取根项目信息
+        println "根项目名称: ${project.rootProject.name}"
+        
+        // 3. 检查插件
+        if (project.plugins.hasPlugin('maven-publish')) {
+            // 配置发布
+        }
+        
+        // 4. 根据版本判断
+        def isSnapshot = project.version.toString().endsWith("SNAPSHOT")
+        
+        // 5. 查找属性
+        def customUrl = project.findProperty('customUrl') ?: 'default-url'
+        
+        // 6. 访问文件
+        def configFile = project.file('config.properties')
+    }
+}
+```
+
+### 完整属性列表
+
+Gradle Project API 提供了更多属性，可以通过以下方式查看：
+
+```groovy
+// 在 build.gradle 中打印所有属性
+project.properties.each { key, value ->
+    println "${key} = ${value}"
+}
+
+// 或者使用 Gradle 命令查看
+// gradle properties
+```
+
+### 参考文档
+
+- [Gradle Project API 官方文档](https://docs.gradle.org/current/javadoc/org/gradle/api/Project.html)
+- 使用 `gradle help --task properties` 查看项目属性
+- 使用 `gradle help --task tasks` 查看所有任务
+
+---
+
+## 二、动态 private-maven-init.gradle 脚本
 
 将以下内容保存为 `private-maven-init.gradle`，或在 CI 脚本中动态生成：
 
@@ -48,7 +190,7 @@ subprojects {
 
 ---
 
-## 二、在 GitLab CI 中动态生成脚本
+## 三、在 GitLab CI 中动态生成脚本
 
 在 `.gitlab-ci.yml` 的每个 job 里添加如下 shell 片段：
 
@@ -93,7 +235,7 @@ EOF
 
 ---
 
-## 三、CI/CD 调用方式
+## 四、CI/CD 调用方式
 
 在所有需要用到私有仓库的 gradle 命令后加上 `--init-script private-maven-init.gradle`，如：
 
@@ -105,7 +247,7 @@ gradle test jacocoTestReport --init-script private-maven-init.gradle
 
 ---
 
-## 四、环境变量安全说明
+## 五、环境变量安全说明
 
 - 请在 GitLab CI/CD 的变量设置中配置 `MAVEN_USERNAME` 和 `MAVEN_PASSWORD`，不要将敏感信息写入源码。
 - 该方案不会污染项目源码，适合多环境、临时切换、CI/CD 场景。
@@ -116,7 +258,7 @@ gradle test jacocoTestReport --init-script private-maven-init.gradle
 
 ---
 
-## 五、CI中上传 all-jars.zip 到 Nexus 示例
+## 六、CI中上传 all-jars.zip 到 Nexus 示例
 
 假设参数：
 - Nexus 地址：`https://nexus.example.com`
@@ -156,7 +298,7 @@ upload:
 
 ---
 
-## 六、CI中上传 all-jars.zip 到 Maven 类型仓库示例
+## 七、CI中上传 all-jars.zip 到 Maven 类型仓库示例
 
 如果你用的是 Maven 类型仓库，上传路径必须符合 Maven 坐标规则（groupId/artifactId/version/文件名）。
 
@@ -208,7 +350,7 @@ upload:
 
 ---
 
-## 七、Maven 指定单元测试目录配置指南
+## 八、Maven 指定单元测试目录配置指南
 
 在 Maven 中，默认的单元测试目录是 `src/test/java`。如果你的测试代码不在这个目录，或者你想指定其他测试目录，可以通过以下几种方式实现：
 
@@ -292,7 +434,7 @@ mvn -Dtest=**/your/custom/test/dir/** test
 
 ---
 
-## 八、pom.xml 中 build 标签位置说明
+## 九、pom.xml 中 build 标签位置说明
 
 在 `pom.xml` 文件中，`<build>` 标签应该放在以下位置：
 
@@ -390,7 +532,7 @@ mvn -Dtest=**/your/custom/test/dir/** test
 
 ---
 
-## 九、在 GitLab CI 中定义全局 build.gradle 配置
+## 十、在 GitLab CI 中定义全局 build.gradle 配置
 
 在 GitLab CI 中，可以通过多种方式定义全局的 Gradle 配置，让所有 stage 共享相同的构建配置，避免在每个 job 中重复定义。
 
@@ -882,6 +1024,262 @@ subprojects {
 5. **使用 `name` 属性**：为每个仓库设置名称，便于调试和识别
 6. **使用 `afterEvaluate`**：确保在项目配置完成后才设置发布仓库
 
+### 在 Deploy 阶段指定部署库
+
+在 GitLab CI/CD 中，可以通过多种方式在 deploy 阶段指定部署到哪个库：
+
+#### 方案一：在 Deploy Job 中定义变量（推荐）
+
+在 deploy job 中定义 `variables`，覆盖全局变量，从而指定部署到特定的库：
+
+```yaml
+deploy:
+  stage: deploy
+  variables:
+    # 覆盖全局变量，指定部署到特定的库
+    PUBLISH_NEXUS_URL: ${PRODUCTION_NEXUS_URL}
+    PUBLISH_NEXUS_USERNAME: ${PRODUCTION_NEXUS_USERNAME}
+    PUBLISH_NEXUS_PASSWORD: ${PRODUCTION_NEXUS_PASSWORD}
+  script:
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - main
+  when: manual
+```
+
+#### 方案二：创建多个 Deploy Job，每个对应不同的环境
+
+为不同的环境创建独立的 deploy job：
+
+```yaml
+# 部署到开发环境
+deploy-dev:
+  stage: deploy
+  variables:
+    PUBLISH_NEXUS_URL: ${DEV_NEXUS_URL}
+    PUBLISH_NEXUS_USERNAME: ${DEV_NEXUS_USERNAME}
+    PUBLISH_NEXUS_PASSWORD: ${DEV_NEXUS_PASSWORD}
+  script:
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - develop
+  when: manual
+  environment:
+    name: development
+
+# 部署到测试环境
+deploy-test:
+  stage: deploy
+  variables:
+    PUBLISH_NEXUS_URL: ${TEST_NEXUS_URL}
+    PUBLISH_NEXUS_USERNAME: ${TEST_NEXUS_USERNAME}
+    PUBLISH_NEXUS_PASSWORD: ${TEST_NEXUS_PASSWORD}
+  script:
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - test
+  when: manual
+  environment:
+    name: test
+
+# 部署到生产环境
+deploy-prod:
+  stage: deploy
+  variables:
+    PUBLISH_NEXUS_URL: ${PROD_NEXUS_URL}
+    PUBLISH_NEXUS_USERNAME: ${PROD_NEXUS_USERNAME}
+    PUBLISH_NEXUS_PASSWORD: ${PROD_NEXUS_PASSWORD}
+  script:
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - main
+    - tags
+  when: manual
+  environment:
+    name: production
+```
+
+#### 方案三：手动触发时传递变量
+
+在 GitLab CI/CD 的手动触发界面中，可以传递自定义变量。在 deploy job 中使用这些变量：
+
+```yaml
+deploy:
+  stage: deploy
+  script:
+    # 显示将要部署到的仓库
+    - echo "部署到仓库: ${PUBLISH_NEXUS_URL:-未指定，使用默认仓库}"
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - main
+  when: manual
+```
+
+**使用方式：**
+1. 在 GitLab Pipeline 页面点击 deploy job 的"Play"按钮
+2. 在弹出的对话框中，可以添加自定义变量：
+   - `PUBLISH_NEXUS_URL` = `https://custom-repo.com/repository/maven-releases/`
+   - `PUBLISH_NEXUS_USERNAME` = `your-username`
+   - `PUBLISH_NEXUS_PASSWORD` = `your-password`
+3. 点击"Run pipeline"执行部署
+
+#### 方案四：根据分支/标签自动选择仓库
+
+根据分支或标签自动选择不同的部署仓库：
+
+```yaml
+deploy:
+  stage: deploy
+  script:
+    # 根据分支或标签设置部署仓库
+    - |
+      if [[ "$CI_COMMIT_REF_NAME" == "main" ]] || [[ "$CI_COMMIT_TAG" != "" ]]; then
+        export PUBLISH_NEXUS_URL="${PROD_NEXUS_URL}"
+        export PUBLISH_NEXUS_USERNAME="${PROD_NEXUS_USERNAME}"
+        export PUBLISH_NEXUS_PASSWORD="${PROD_NEXUS_PASSWORD}"
+        echo "部署到生产环境仓库"
+      elif [[ "$CI_COMMIT_REF_NAME" == "develop" ]]; then
+        export PUBLISH_NEXUS_URL="${DEV_NEXUS_URL}"
+        export PUBLISH_NEXUS_USERNAME="${DEV_NEXUS_USERNAME}"
+        export PUBLISH_NEXUS_PASSWORD="${DEV_NEXUS_PASSWORD}"
+        echo "部署到开发环境仓库"
+      else
+        export PUBLISH_NEXUS_URL="${TEST_NEXUS_URL}"
+        export PUBLISH_NEXUS_USERNAME="${TEST_NEXUS_USERNAME}"
+        export PUBLISH_NEXUS_PASSWORD="${TEST_NEXUS_PASSWORD}"
+        echo "部署到测试环境仓库"
+      fi
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - branches
+    - tags
+  when: manual
+```
+
+#### 方案五：使用 GitLab CI/CD 的 rules 条件判断
+
+使用 `rules` 根据条件选择不同的配置：
+
+```yaml
+deploy:
+  stage: deploy
+  variables:
+    # 默认值
+    PUBLISH_NEXUS_URL: ${TEST_NEXUS_URL}
+    PUBLISH_NEXUS_USERNAME: ${TEST_NEXUS_USERNAME}
+    PUBLISH_NEXUS_PASSWORD: ${TEST_NEXUS_PASSWORD}
+  script:
+    - echo "部署到: ${PUBLISH_NEXUS_URL}"
+    - $GRADLE_CMD publish --no-daemon
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables:
+        PUBLISH_NEXUS_URL: ${PROD_NEXUS_URL}
+        PUBLISH_NEXUS_USERNAME: ${PROD_NEXUS_USERNAME}
+        PUBLISH_NEXUS_PASSWORD: ${PROD_NEXUS_PASSWORD}
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        PUBLISH_NEXUS_URL: ${DEV_NEXUS_URL}
+        PUBLISH_NEXUS_USERNAME: ${DEV_NEXUS_USERNAME}
+        PUBLISH_NEXUS_PASSWORD: ${DEV_NEXUS_PASSWORD}
+    - when: manual
+      allow_failure: false
+```
+
+#### 方案对比
+
+| 方案 | 优点 | 缺点 | 适用场景 |
+|------|------|------|----------|
+| 方案一（Job 变量） | 简单直接，易于理解 | 需要修改配置文件 | 固定环境部署 |
+| 方案二（多个 Job） | 清晰明确，易于管理 | 配置较多 | 多环境部署 |
+| 方案三（手动传递） | 灵活，无需修改配置 | 需要手动输入 | 临时或特殊部署 |
+| 方案四（分支判断） | 自动化，减少错误 | 脚本较复杂 | 根据分支自动选择 |
+| 方案五（rules） | 声明式，易于维护 | GitLab 版本要求 | 现代 GitLab CI/CD |
+
+#### 推荐方案
+
+**推荐使用方案二（多个 Deploy Job）或方案五（rules）**，原因：
+1. ✅ **清晰明确**：每个环境有独立的 job，易于理解和维护
+2. ✅ **安全性高**：不同环境使用不同的认证信息
+3. ✅ **易于审计**：可以清楚地看到部署到哪个环境
+4. ✅ **支持回滚**：可以轻松回滚到之前的版本
+
+#### 完整示例
+
+结合 init script 和多个 deploy job 的完整配置：
+
+```yaml
+variables:
+  GRADLE_HOME: "/opt/gradle-8.14"
+  PATH: "$GRADLE_HOME/bin:$PATH"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  GRADLE_CMD: "gradle --init-script ci-init.gradle"
+
+before_script:
+  - chmod +x $GRADLE_HOME/bin/gradle
+  - gradle --version
+  - |
+    cat > ci-init.gradle << 'EOF'
+    allprojects {
+        repositories {
+            maven { url = 'https://maven.aliyun.com/repository/public' }
+            mavenCentral()
+        }
+    }
+    
+    subprojects {
+        afterEvaluate { project ->
+            if (project.plugins.hasPlugin('maven-publish')) {
+                publishing {
+                    repositories {
+                        maven {
+                            name = 'publishRepository'
+                            // 使用环境变量指定发布仓库
+                            url = System.getenv('PUBLISH_NEXUS_URL') ?: 'https://default-repo.com/repository/maven-releases/'
+                            credentials {
+                                username = System.getenv("PUBLISH_NEXUS_USERNAME") ?: project.findProperty("publishNexusUsername")
+                                password = System.getenv("PUBLISH_NEXUS_PASSWORD") ?: project.findProperty("publishNexusPassword")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    EOF
+
+deploy-dev:
+  stage: deploy
+  variables:
+    PUBLISH_NEXUS_URL: ${DEV_NEXUS_URL}
+    PUBLISH_NEXUS_USERNAME: ${DEV_NEXUS_USERNAME}
+    PUBLISH_NEXUS_PASSWORD: ${DEV_NEXUS_PASSWORD}
+  script:
+    - echo "部署到开发环境: ${PUBLISH_NEXUS_URL}"
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - develop
+  when: manual
+  environment:
+    name: development
+
+deploy-prod:
+  stage: deploy
+  variables:
+    PUBLISH_NEXUS_URL: ${PROD_NEXUS_URL}
+    PUBLISH_NEXUS_USERNAME: ${PROD_NEXUS_USERNAME}
+    PUBLISH_NEXUS_PASSWORD: ${PROD_NEXUS_PASSWORD}
+  script:
+    - echo "部署到生产环境: ${PUBLISH_NEXUS_URL}"
+    - $GRADLE_CMD publish --no-daemon
+  only:
+    - main
+    - tags
+  when: manual
+  environment:
+    name: production
+```
+
 ### 注意事项
 
 - 确保在 GitLab CI/CD 变量设置中配置了 `NEXUS_URL`、`NEXUS_USERNAME`、`NEXUS_PASSWORD`
@@ -889,3 +1287,16 @@ subprojects {
 - 如果需要在 init script 中使用环境变量，使用 `System.getenv()` 而不是 `${}` 语法
 
 如需进一步定制或有特殊需求，请联系开发负责人。
+
+subprojects {
+    afterEvaluate { project ->
+        // 获取版本
+        def version = project.version.toString()
+        
+        // 判断版本类型
+        def repoType = version.endsWith("SNAPSHOT") ? "snapshots" : "releases"
+        
+        // 使用版本
+        println "项目 ${project.name} 版本: ${version}"
+    }
+}
